@@ -1,0 +1,73 @@
+[package]
+name = "azure_blob_proxy"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "blob_proxy"
+path = "src/blob_proxy.rs"
+required-features = ["blob_proxy"]
+
+[[bin]]
+name = "blob_downaloder"
+path = "src/blob_downloader.rs"
+required-features = ["blob_downloader"]
+
+
+[dependencies]
+actix-web = { version = "4" , optional = true}
+azure_core = { version = "0.20",default-features = false, features = ["hmac_rust","enable_reqwest_rustls"] , optional = true }
+azure_storage = { version = "0.20" , default-features = false, features = ["hmac_rust","enable_reqwest_rustls"] , optional = true }
+azure_storage_blobs = {version = "0.20" ,default-features = false, features = ["hmac_rust","enable_reqwest_rustls"] , optional = true }
+azure_identity = { version = "0.20" , default-features = false,features = ["enable_reqwest_rustls"] , optional = true }
+
+serde = { version = "1.0", features = ["derive"] , optional = true }
+serde_json = { version = "1.0" , optional = true }
+log = { version = "0.4" , optional = true}
+pretty_env_logger = { version = "0.5" , optional = true}
+sysinfo = {version = "0.30" , optional = true}
+
+tokio = { version = "1", features = ["full"] ,optional = true}
+reqwest = {version = "0.12", default-features = false,features = ["rustls-tls","charset","http2","macos-system-configuration"],optional = true}
+
+futures = { version = "0.3" , optional = true}
+async-stream = { version = "0.3" , optional = true}
+
+
+opentelemetry-application-insights = { version = "0.33",default-features = false , features = ["logs","metrics","live-metrics","reqwest-client-rustls"] , optional = true}
+opentelemetry = { version = "0.23" , features = ["logs_level_enabled","metrics","logs"] , optional = true}
+opentelemetry_sdk = { version = "0.23", features = ["metrics", "logs", "logs_level_enabled", "rt-tokio"], optional = true }
+opentelemetry-appender-log = { version = "0.4", features = ["logs_level_enabled"] , optional = true }
+opentelemetry-semantic-conventions = {version = "0.15" , optional = true}
+
+
+[features]
+blob_proxy = [
+    "actix-web" ,
+    "azure_core" ,
+    "azure_storage" ,
+    "azure_storage_blobs" ,
+    "azure_identity" ,
+    "serde" ,
+    "serde_json" ,
+    "log" ,
+    "pretty_env_logger" ,
+    "sysinfo" ,
+     "futures",
+    "async-stream",
+    "reqwest",
+    "opentelemetry-application-insights",
+    "opentelemetry",
+    "opentelemetry_sdk",
+    "opentelemetry-appender-log",
+    "opentelemetry-semantic-conventions"
+]
+blob_downloader = [
+    "serde" ,
+    "serde_json" ,
+    "log" ,
+    "pretty_env_logger" ,
+    "tokio" ,
+    "reqwest" ,
+    "futures"
+]
