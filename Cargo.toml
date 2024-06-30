@@ -28,7 +28,7 @@ pretty_env_logger = { version = "0.5" , optional = true}
 sysinfo = {version = "0.30" , optional = true}
 
 tokio = { version = "1", features = ["full"] ,optional = true}
-reqwest = {version = "0.11", default-features = false,features = ["rustls-tls","json"],optional = true}
+reqwest = {version = "0.11", default-features = false, features = ["rustls-tls", "json", "stream"],optional = true}
 
 futures = { version = "0.3" , optional = true}
 async-stream = { version = "0.3" , optional = true}
