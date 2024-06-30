@@ -28,17 +28,18 @@ pretty_env_logger = { version = "0.5" , optional = true}
 sysinfo = {version = "0.30" , optional = true}
 
 tokio = { version = "1", features = ["full"] ,optional = true}
-reqwest = {version = "0.12", default-features = false,features = ["rustls-tls","charset","http2","macos-system-configuration"],optional = true}
+reqwest = {version = "0.11", default-features = false,features = ["rustls-tls","json"],optional = true}
 
 futures = { version = "0.3" , optional = true}
 async-stream = { version = "0.3" , optional = true}
 
 
 opentelemetry-application-insights = { version = "0.33",default-features = false , features = ["logs","metrics","live-metrics","reqwest-client-rustls"] , optional = true}
-opentelemetry = { version = "0.23" , features = ["logs_level_enabled","metrics","logs"] , optional = true}
-opentelemetry_sdk = { version = "0.23", features = ["metrics", "logs", "logs_level_enabled", "rt-tokio"], optional = true }
-opentelemetry-appender-log = { version = "0.4", features = ["logs_level_enabled"] , optional = true }
+opentelemetry = { version = "0.23" ,default-features = false, features = [ "logs_level_enabled","metrics","trace","logs"] , optional = true}
+opentelemetry_sdk = { version = "0.23", features = ["metrics", "logs","trace", "logs_level_enabled", "rt-tokio"], optional = true }
+opentelemetry-appender-log = { version = "0.4", features = ["logs_level_enabled","with-serde"] , optional = true }
 opentelemetry-semantic-conventions = {version = "0.15" , optional = true}
+opentelemetry-http = {version = "0.12", features = ["reqwest-rustls"],optional = true}
 
 
 [features]
@@ -60,7 +61,9 @@ blob_proxy = [
     "opentelemetry",
     "opentelemetry_sdk",
     "opentelemetry-appender-log",
-    "opentelemetry-semantic-conventions"
+    "opentelemetry-semantic-conventions",
+    "opentelemetry-http/reqwest-rustls"
+
 ]
 blob_downloader = [
     "serde" ,

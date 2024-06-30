@@ -2,13 +2,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use actix_web::{HttpResponse, Responder, web};
+use actix_web::{web, HttpResponse, Responder};
 use azure_storage::prelude::*;
 use azure_storage_blobs::prelude::*;
 use futures::stream::StreamExt;
 use futures::TryStreamExt;
 use log::{error, info};
 use sysinfo::System;
+
+use opentelemetry::trace::Tracer as _;
+use opentelemetry_sdk::runtime::Tokio;
 
 async fn stream_blob(path: web::Path<(String, String)>) -> impl Responder {
     let (container, blob) = path.into_inner();
@@ -47,8 +50,7 @@ async fn stream_blob(path: web::Path<(String, String)>) -> impl Responder {
         }
         Err(err) => {
             error!("Error getting blob client: {:?}", err);
-            HttpResponse::InternalServerError()
-                .body(format!("Failed to get blob client: {}", err))
+            HttpResponse::InternalServerError().body(format!("Failed to get blob client: {}", err))
         }
     };
 }
@@ -81,7 +83,8 @@ async fn main() -> std::io::Result<()> {
     system.refresh_memory();
 
     // Get total and used memory
-    info!("Total memory: {:.2} MB , Free memory: {:.2}",
+    info!(
+        "Total memory: {:.2} MB , Free memory: {:.2}",
         system.total_memory() / (1024 * 1024),
         system.free_memory() / (1024 * 1024)
     );
@@ -94,9 +97,15 @@ async fn main() -> std::io::Result<()> {
             system.global_cpu_info().cpu_usage(),
             (system.free_memory() as f64) / (1024 * 1024) as f64
         );
-
-
     });
+
+    let _trace = opentelemetry_application_insights::new_pipeline_from_env()
+        .expect("env var APPLICATIONINSIGHTS_CONNECTION_STRING is valid connection string")
+        .with_client(reqwest::Client::new())
+        .with_live_metrics(true)
+        .install_batch(Tokio);
+
+
 
     let _result = actix_web::HttpServer::new(|| {
         actix_web::App::new()
@@ -105,11 +114,13 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::Logger::default())
             .route("/{container}/{blob}", web::get().to(stream_blob))
     })
-        .bind("0.0.0.0:8888")?
-        .run()
-        .await;
-
+    .bind("0.0.0.0:8888")?
+    .run()
+    .await;
 
     info!("Server stopped");
+
+    opentelemetry::global::shutdown_tracer_provider();
+
     Ok(())
 }
