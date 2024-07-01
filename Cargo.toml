@@ -41,6 +41,7 @@ opentelemetry-appender-log = { version = "0.4", features = ["logs_level_enabled"
 opentelemetry-semantic-conventions = {version = "0.15" , optional = true}
 opentelemetry-http = {version = "0.12", features = ["reqwest-rustls"],optional = true}
 
+actix-web-opentelemetry = {version = "0.18",features = ["metrics"],optional = true}
 
 [features]
 blob_proxy = [
@@ -62,8 +63,8 @@ blob_proxy = [
     "opentelemetry_sdk",
     "opentelemetry-appender-log",
     "opentelemetry-semantic-conventions",
-    "opentelemetry-http/reqwest-rustls"
-
+    "opentelemetry-http/reqwest-rustls",
+    "actix-web-opentelemetry"
 ]
 blob_downloader = [
     "serde" ,

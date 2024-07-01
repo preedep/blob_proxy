@@ -1,17 +1,21 @@
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, web};
+use actix_web_opentelemetry::RequestTracing;
 use azure_storage::prelude::*;
 use azure_storage_blobs::prelude::*;
 use futures::stream::StreamExt;
 use futures::TryStreamExt;
 use log::{error, info};
-use sysinfo::System;
-
+use opentelemetry::KeyValue;
 use opentelemetry::trace::Tracer as _;
+use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::runtime::Tokio;
+use opentelemetry_semantic_conventions as semcov;
+use sysinfo::System;
 
 async fn stream_blob(path: web::Path<(String, String)>) -> impl Responder {
     let (container, blob) = path.into_inner();
@@ -77,6 +81,36 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting server");
 
+    let client = reqwest::Client::new();
+
+    let _trace = opentelemetry_application_insights::new_pipeline_from_env()
+        .expect("env var APPLICATIONINSIGHTS_CONNECTION_STRING is valid connection string")
+        .with_client(client.clone())
+        .with_live_metrics(true)
+        .install_batch(Tokio);
+
+
+    let connection_string = std::env::var("APPLICATIONINSIGHTS_CONNECTION_STRING").unwrap();
+    let exporter = opentelemetry_application_insights::Exporter::new_from_connection_string(
+        connection_string,
+        client,
+    ).expect("connection string is valid");
+    let logger_provider = opentelemetry_sdk::logs::LoggerProvider::builder()
+        .with_batch_exporter(exporter, Tokio)
+        .with_config(
+            opentelemetry_sdk::logs::config().with_resource(Resource::new(vec![
+                KeyValue::new(semcov::resource::SERVICE_NAMESPACE, "myapp"),
+                KeyValue::new(semcov::resource::SERVICE_NAME, "blob_proxy"),
+            ])),
+        )
+        .build();
+
+    let otel_log_appender =
+        opentelemetry_appender_log::OpenTelemetryLogBridge::new(&logger_provider);
+    log::set_boxed_logger(Box::new(otel_log_appender)).expect("Could not set logger");
+    log::set_max_level(log::Level::Info.to_level_filter());
+
+
     let mut system = System::new_all();
 
     // Refresh system memory information
@@ -89,7 +123,19 @@ async fn main() -> std::io::Result<()> {
         system.free_memory() / (1024 * 1024)
     );
 
+
+    // Create an atomic flag to signal thread termination
+    let stop_flag = Arc::new(AtomicBool::new(false));
+
+    // Clone the flag for the thread
+    let stop_flag_clone = Arc::clone(&stop_flag);
+
+
     thread::spawn(move || loop {
+        if stop_flag_clone.load(Ordering::Relaxed) {
+            break;
+        }
+
         system.refresh_all();
         thread::sleep(Duration::from_secs(1));
         info!(
@@ -99,28 +145,27 @@ async fn main() -> std::io::Result<()> {
         );
     });
 
-    let _trace = opentelemetry_application_insights::new_pipeline_from_env()
-        .expect("env var APPLICATIONINSIGHTS_CONNECTION_STRING is valid connection string")
-        .with_client(reqwest::Client::new())
-        .with_live_metrics(true)
-        .install_batch(Tokio);
-
-
 
     let _result = actix_web::HttpServer::new(|| {
         actix_web::App::new()
             .app_data(web::PayloadConfig::new(usize::MAX)) // Increase payload limit
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())
+            .wrap(RequestTracing::new())
             .route("/{container}/{blob}", web::get().to(stream_blob))
     })
-    .bind("0.0.0.0:8888")?
-    .run()
-    .await;
+        .bind("0.0.0.0:8888")?
+        .run()
+        .await;
 
     info!("Server stopped");
 
+    logger_provider.shutdown().unwrap();
     opentelemetry::global::shutdown_tracer_provider();
+
+    // Set the flag to stop the thread
+    stop_flag.store(true, Ordering::Relaxed);
+
 
     Ok(())
 }
