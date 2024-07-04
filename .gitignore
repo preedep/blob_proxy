@@ -16,3 +16,4 @@ Cargo.lock
 .idea/
 run.sh
 run_downloader.sh
+/mockfile_30mb.txt
